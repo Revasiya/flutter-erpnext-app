@@ -1,25 +1,20 @@
 // ignore: file_names
 
 class ERPNextDocument {
-  final String status;
-  final String employeeName;
   final String name;
-  final String fromDate;
-  final String toDate;
+  final String status;
+  final String? fromDate; // Can be null
+  final String? toDate; // Can be null
 
   ERPNextDocument(
-      {required this.status,
-      required this.employeeName,
-      required this.name,
-      required this.toDate,
-      required this.fromDate});
+      {required this.name, required this.status, this.fromDate, this.toDate});
 
   factory ERPNextDocument.fromJson(Map<String, dynamic> json) {
     return ERPNextDocument(
-        status: json['status'],
-        employeeName: json['employee_name'],
-        name: json['name'],
-        toDate: json['to_Date'],
-        fromDate: json['from_date']);
+      name: json['name'] ?? '', // Provide a default value if null
+      status: json['status'] ?? '', // Provide a default value if null
+      fromDate: json['from_date'], // Can be null
+      toDate: json['to_date'], // Can be null
+    );
   }
 }
