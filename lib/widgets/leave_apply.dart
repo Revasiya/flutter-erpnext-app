@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_erpnext/auth/auth_token.dart';
 import 'package:flutter_erpnext/models/Doc_list.dart';
 import 'package:flutter_erpnext/widgets/leave_form.dart';
 import 'package:intl/intl.dart';
@@ -6,9 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class ApplyForLeave extends StatefulWidget {
-  final String employeeName;
-
-  const ApplyForLeave({Key? key, required this.employeeName}) : super(key: key);
+  const ApplyForLeave({Key? key}) : super(key: key);
 
   @override
   State<StatefulWidget> createState() {
@@ -19,6 +18,29 @@ class ApplyForLeave extends StatefulWidget {
 class _ApplyForLeaveState extends State<ApplyForLeave> {
   late Future<List<ERPNextDocument>> futureDocuments;
 
+  void _onClickFloatingButton() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LeaveApplicationFormScreen(
+          onFormSubmitSuccess:
+              refreshData, // Assuming refreshData is defined in the calling widget
+        ),
+      ),
+    );
+  }
+
+  Future<void> refreshData() async {
+    try {
+      List<ERPNextDocument> updatedDocuments = await fetchDocuments();
+      setState(() {
+        futureDocuments = Future.value(updatedDocuments);
+      });
+    } catch (error) {
+      // Handle or log error
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -26,50 +48,82 @@ class _ApplyForLeaveState extends State<ApplyForLeave> {
   }
 
   Future<List<ERPNextDocument>> fetchDocuments() async {
-    final response = await http.get(
-        Uri.parse(
-            'https://st-erp.frappe.cloud/api/resource/Leave Application?fields=["status", "employee_name","name", "from_date", "to_date"]'),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Cookie':
-              'sid=c1a6576e5100ad4766f337f7f7a175f56fb0a6a716a226c901df13b8'
+    final String? token = await AuthStorage.getAuthToken();
 
-          // Add your authorization headers or other necessary headers
-        });
+    // Proceed only if token is not null
+    if (token != null) {
+      final response = await http.get(
+          Uri.parse(
+              'https://st-erp.frappe.cloud/api/resource/Leave Application?fields=["status", "employee_name","name", "from_date", "to_date"]'),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Cookie': 'sid=$token' // Use the token in the Cookie header
+          });
 
-    if (response.statusCode == 200) {
-      List<dynamic> jsonResponse = json.decode(response.body)['data'];
-      return jsonResponse.map((doc) => ERPNextDocument.fromJson(doc)).toList();
+      if (response.statusCode == 200) {
+        List<dynamic> jsonResponse = json.decode(response.body)['data'];
+        return jsonResponse
+            .map((doc) => ERPNextDocument.fromJson(doc))
+            .toList();
+      } else {
+        throw Exception('Failed to load documents');
+      }
     } else {
-      throw Exception('Failed to load documents');
+      throw Exception('Token not found');
     }
   }
 
   Widget _buildDocumentTable(List<ERPNextDocument> documents) {
-    return DataTable(
-      columnSpacing: 20.0, // Define column spacing
-      columns: const <DataColumn>[
-        DataColumn(label: Text('Document Name')),
-        DataColumn(label: Text('Status')),
-        DataColumn(label: Text('From Date')),
-        DataColumn(label: Text('To Date')),
-      ],
-      rows: documents.map((doc) {
-        final formattedFromDate =
-            DateFormat('yyyy-MM-dd').format(DateTime.parse(doc.fromDate));
-        final formattedToDate =
-            DateFormat('yyyy-MM-dd').format(DateTime.parse(doc.toDate));
-
-        return DataRow(
-          cells: <DataCell>[
-            DataCell(Text(doc.name)),
-            DataCell(Text(doc.status)),
-            DataCell(Text(formattedFromDate)),
-            DataCell(Text(formattedToDate)),
+    return Scrollbar(
+      thickness: 5,
+      thumbVisibility: EditableText.debugDeterministicCursor,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columnSpacing: 10.0, // Define column spacing
+          columns: const <DataColumn>[
+            DataColumn(label: Text('Document Name')),
+            DataColumn(label: Text('Status')),
+            DataColumn(label: Text('From Date')),
+            DataColumn(label: Text('To Date')),
           ],
-        );
-      }).toList(),
+          rows: documents.map((doc) {
+            final formattedFromDate =
+                DateFormat('yyyy-MM-dd').format(DateTime.parse(doc.fromDate!));
+            final formattedToDate =
+                DateFormat('yyyy-MM-dd').format(DateTime.parse(doc.toDate!));
+
+            return DataRow(
+              cells: <DataCell>[
+                DataCell(Text(doc.name)),
+                DataCell(Text(
+                  doc.status,
+                  style: TextStyle(
+                    color: (doc.status == 'Approved')
+                        ? Colors.green
+                        : (doc.status == 'Rejected')
+                            ? Colors.red
+                            : (doc.status == 'Pending')
+                                ? Colors.orange
+                                : Color.fromARGB(255, 183, 106, 11),
+                  ),
+                )),
+                DataCell(Text(doc.fromDate != null
+                        ? DateFormat('yyyy-MM-dd')
+                            .format(DateTime.parse(doc.fromDate!))
+                        : 'N/A' // Default text if fromDate is null
+                    )),
+                DataCell(Text(doc.toDate != null
+                        ? DateFormat('yyyy-MM-dd')
+                            .format(DateTime.parse(doc.toDate!))
+                        : 'N/A' // Default text if toDate is null
+                    )),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
     );
   }
 
@@ -84,35 +138,25 @@ class _ApplyForLeaveState extends State<ApplyForLeave> {
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (snapshot.hasData) {
-            return CustomScrollView(
-              slivers: [
-                SliverAppBar(
-                  expandedHeight: 200.0,
-                  floating: false,
-                  pinned: true,
-                  flexibleSpace: FlexibleSpaceBar(
-                    centerTitle: true,
-                    title: Text(widget.employeeName,
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 16.0)),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: _buildDocumentTable(snapshot.data!),
-                ),
-              ],
-            );
+            return Scrollbar(
+                thumbVisibility: true,
+                thickness:
+                    10, // Set to true if you always want to show the scrollbar
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _buildDocumentTable(snapshot.data!),
+                    ),
+                  ],
+                ));
           } else {
             return const Center(child: Text('No documents found'));
           }
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Assuming showApplyLeaveForm is defined elsewhere
-          showApplyLeaveForm(context);
-        },
-        tooltip: 'Apply for Leave',
+        onPressed: _onClickFloatingButton,
+        tooltip: ' for Leave',
         backgroundColor: const Color.fromRGBO(43, 137, 255, 1),
         child: const Icon(Icons.add),
       ),

@@ -16,12 +16,7 @@ class _MyHomePageState extends State<MyHomePage> {
   late final List<ERPNextDocument> documents;
   int _currentIndex = 0;
 
-  final List<Widget> _children = [
-    ApplyForLeave(
-      employeeName: '',
-    ),
-    const LeaveReport()
-  ];
+  final List<Widget> _children = [const ApplyForLeave(), const LeaveReport()];
 
   void onTabTapped(int index) {
     setState(() {
