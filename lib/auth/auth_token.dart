@@ -11,4 +11,8 @@ class AuthStorage {
       print("Error saving token: $e");
     }
   }
+
+  static Future<String?> getAuthToken() async {
+    return await _storage.read(key: 'authToken');
+  }
 }
