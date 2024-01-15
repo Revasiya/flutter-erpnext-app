@@ -1,5 +1,3 @@
-// ignore: file_names
-
 class ERPNextDocument {
   final String name;
   final String status;
